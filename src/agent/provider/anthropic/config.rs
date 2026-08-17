@@ -48,6 +48,22 @@ pub struct TextGenerationConfig {
     #[serde(default = "super::super::default_temperature")]
     pub temperature: f32,
 
+    /// Whether to send sampling parameters (`temperature`) to the API.
+    ///
+    /// Current Claude models (Opus 5, Sonnet 5, Fable 5, Opus 4.7+) reject
+    /// `temperature` with a 400, so this defaults to `false`. Enable it only for
+    /// older models that still accept sampling parameters.
+    #[serde(default)]
+    pub send_sampling_params: bool,
+
+    /// Enable adaptive thinking on models that support it (Claude 4.6+).
+    #[serde(default)]
+    pub thinking: bool,
+
+    /// Optional effort level: `low`, `medium`, `high`, `xhigh`, or `max`.
+    #[serde(default)]
+    pub effort: Option<String>,
+
     #[serde(default)]
     pub max_response_tokens: u32,
 
@@ -61,6 +77,9 @@ impl Default for TextGenerationConfig {
             model_id: default_text_model_id(),
             prompt: Some(default_prompt().to_owned()),
             temperature: super::super::default_temperature(),
+            send_sampling_params: false,
+            thinking: false,
+            effort: None,
             max_response_tokens: 8192,
             max_context_tokens: 204_800,
         }
@@ -68,5 +87,6 @@ impl Default for TextGenerationConfig {
 }
 
 fn default_text_model_id() -> String {
-    "claude-3-7-sonnet-20250219".to_owned()
+    // A current model. Older ids (e.g. claude-3-7-sonnet) are retired and 404.
+    "claude-opus-5".to_owned()
 }

@@ -15,7 +15,10 @@ name = "baibot"
 path = "src/lib.rs"
 
 [dependencies]
-anthropic = { git = "https://github.com/etkecc/anthropic-rs.git", branch = "fix-content-block-image" }
+# Modernized locally in ~/storage/anthropic-rs (tolerant enums, nested ImageSource,
+# Option model, adaptive thinking / effort, current models). Switch to a git dep on
+# a published fork before the server rebuild — path deps don't resolve on /opt/baibot.
+anthropic = { git = "https://github.com/stonehold76/anthropic-rs", branch = "modernize" }
 anyhow = "1.0.*"
 async-openai = { version = "0.41.0", features = ["audio", "chat-completion", "image", "responses"] }
 base64 = "0.23.*"

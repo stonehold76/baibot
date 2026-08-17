@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use anthropic::client::{Client, ClientBuilder};
-use anthropic::types::ContentBlock;
+use anthropic::types::{ContentBlock, Effort, OutputConfig, ThinkingConfig};
 
 use super::super::ControllerTrait;
 use crate::agent::AgentPurpose;
@@ -154,9 +154,34 @@ impl ControllerTrait for Controller {
             request.system = text.clone();
         }
 
-        request.model = text_generation_config.model_id.clone();
-        request.temperature = Some(temperature as f64);
+        // `model` is now `Option<String>` in the anthropic crate (resolved against a
+        // client default when unset); we always set it explicitly here.
+        request.model = Some(text_generation_config.model_id.clone());
         request.max_tokens = text_generation_config.max_response_tokens as usize;
+
+        // Current Claude models reject sampling parameters with a 400, so only send
+        // `temperature` when the config opts in (for older models).
+        if text_generation_config.send_sampling_params {
+            request.temperature = Some(temperature as f64);
+        }
+
+        if text_generation_config.thinking {
+            request.thinking = Some(ThinkingConfig::Adaptive { display: None });
+        }
+
+        if let Some(effort) = &text_generation_config.effort {
+            match parse_effort(effort) {
+                Some(effort) => {
+                    request.output_config = Some(OutputConfig {
+                        effort: Some(effort),
+                    });
+                }
+                None => tracing::warn!(
+                    effort = effort,
+                    "Ignoring unrecognized Anthropic effort value (expected one of: low, medium, high, xhigh, max)"
+                ),
+            }
+        }
 
         if let Ok(request_as_json) = serde_json::to_string(&request) {
             tracing::trace!(
@@ -181,6 +206,10 @@ impl ControllerTrait for Controller {
                 ContentBlock::Image { .. } => {
                     text_parts.push("The model responded with an image".to_string());
                 }
+                // `ContentBlock` is `#[non_exhaustive]` in the anthropic crate.
+                // Thinking blocks are internal reasoning and are intentionally not
+                // surfaced; tool-use and any future/unknown block types are skipped.
+                _ => {}
             }
         }
 
@@ -266,5 +295,16 @@ impl ControllerTrait for Controller {
 
     fn text_to_speech_speed(&self) -> Option<f32> {
         None
+    }
+}
+
+fn parse_effort(value: &str) -> Option<Effort> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "low" => Some(Effort::Low),
+        "medium" => Some(Effort::Medium),
+        "high" => Some(Effort::High),
+        "xhigh" => Some(Effort::Xhigh),
+        "max" => Some(Effort::Max),
+        _ => None,
     }
 }
