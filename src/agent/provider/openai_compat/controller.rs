@@ -128,6 +128,16 @@ impl ControllerTrait for Controller {
             conversation_messages.insert(0, prompt_message);
         }
 
+        // Convey the requesting Matrix user's MXID via the OpenAI `user` field so the
+        // memory RAG proxy can scope private/communal memory per person.
+        let request_user = conversation_messages.iter().rev().find_map(|m| {
+            if matches!(m.author, LLMAuthor::User) {
+                m.sender_id.as_ref().map(|id| id.to_string())
+            } else {
+                None
+            }
+        });
+
         let openai_conversation_messages: Vec<Message> =
             super::utils::convert_llm_messages_to_openai_messages(conversation_messages);
 
@@ -156,7 +166,7 @@ impl ControllerTrait for Controller {
             presence_penalty: None,
             frequency_penalty: None,
             logit_bias: None,
-            user: None,
+            user: request_user,
             messages: openai_conversation_messages,
         };
 
